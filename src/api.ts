@@ -1,7 +1,11 @@
 import type { User } from './types';
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.replace(/\/$/, '');
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+// URL は「https://xxx.supabase.co」「…/」「…/rest/v1」のどれで登録されていても動くようにそろえる
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)
+  ?.trim()
+  .replace(/\/+$/, '')
+  .replace(/\/rest\/v1$/, '');
+const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
 
 export class ApiError extends Error {
   constructor(public code: string) {
