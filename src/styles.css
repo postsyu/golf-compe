@@ -201,6 +201,12 @@ input.short { width: 80px; }
 .dash-head .muted { color: #cfe8d9; margin: 4px 0 0; }
 .dash-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dash-title h1 { font-size: 1.25rem; }
+.dash-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.dash-input-link {
+  flex-shrink: 0; display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px;
+  border-radius: 999px; background: #fff; color: var(--green); font-weight: 700; font-size: .9rem; text-decoration: none;
+}
+.dash-foot .live { margin: 0; }
 .live { margin: 6px 0 0; font-size: .75rem; color: #cfe8d9; display: flex; align-items: center; gap: 6px; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #7dff9f; animation: pulse 1.6s infinite; }
 @keyframes pulse { 50% { opacity: .3; } }

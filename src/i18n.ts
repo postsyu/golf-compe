@@ -77,6 +77,8 @@ const ja = {
   dashNotFound: 'コンペが見つかりません。URLを確認してください。',
   dashExpired: '公開期間が終了しました。',
   autoUpdate: '自動更新中',
+  goToInput: '入力画面へ',
+  loginToInput: 'ログインして入力',
   lastUpdated: '最終更新 {time}',
 
   // 管理

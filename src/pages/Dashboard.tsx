@@ -1,4 +1,4 @@
-import { rpc } from '../api';
+import { getToken, rpc } from '../api';
 import { ContestTops, ErrorBox, Loading, LocalRules, Ranking, StatusBadge } from '../components';
 import { useLiveData } from '../hooks';
 import { t } from '../i18n';
@@ -37,19 +37,25 @@ export default function Dashboard({ token }: { token: string }) {
             {formatDate(data.compe.event_date)} {data.compe.course}
           </p>
         )}
-        <p className="live">
-          <span className="live-dot" />
-          {t('autoUpdate')}
-          {updatedAt && ` · ${t('lastUpdated', { time: updatedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) })}`}
-        </p>
+        <div className="dash-foot">
+          <p className="live">
+            <span className="live-dot" />
+            {t('autoUpdate')}
+            {updatedAt && ` · ${t('lastUpdated', { time: updatedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) })}`}
+          </p>
+          {/* 入力画面へ（未ログインならログイン画面が開く） */}
+          <a className="dash-input-link" href="#/">
+            ✎ {getToken() ? t('goToInput') : t('loginToInput')}
+          </a>
+        </div>
       </header>
       <main className="content">
         {error && <ErrorBox code={error} onRetry={reload} />}
         {!data && !error && <Loading />}
         {data && (
           <>
-            <Ranking body={data} />
             <ContestTops body={data} />
+            <Ranking body={data} />
             <LocalRules text={data.compe.local_rules} />
           </>
         )}
