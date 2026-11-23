@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { ApiError, rpc, saveSession } from '../api';
-import { ErrorBox } from '../components';
+import { ErrorBox, HelpLinks } from '../components';
 import { t } from '../i18n';
 import { navigate } from '../router';
 import type { User } from '../types';
@@ -24,7 +24,9 @@ export default function Login() {
         setError(r.error ?? 'login_failed');
       } else {
         saveSession(r.token, r.user);
-        navigate('/');
+        // ログイン画面そのものを開いていた場合はトップへ、それ以外（共有されたURLなど）はその画面へ進む
+        const here = location.hash.replace(/^#/, '') || '/';
+        navigate(here === '/login' ? '/' : here);
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.code : 'unknown');
@@ -65,6 +67,7 @@ export default function Login() {
           {busy ? t('loading') : t('loginButton')}
         </button>
       </form>
+      <HelpLinks />
     </div>
   );
 }

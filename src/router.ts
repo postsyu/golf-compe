@@ -8,8 +8,12 @@ function currentPath(): string {
 
 export function useRoute(): string {
   const [path, setPath] = useState(currentPath);
+  const [, setTick] = useState(0);
   useEffect(() => {
-    const on = () => setPath(currentPath());
+    const on = () => {
+      setPath(currentPath());
+      setTick((n) => n + 1);
+    };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, []);
@@ -18,6 +22,8 @@ export function useRoute(): string {
 
 export function navigate(path: string) {
   if (currentPath() !== path) location.hash = path;
+  // 同じパスでも画面を描き直す（ログイン直後など、表示すべき画面が変わっている場合がある）
+  else window.dispatchEvent(new HashChangeEvent('hashchange'));
   window.scrollTo(0, 0);
 }
 

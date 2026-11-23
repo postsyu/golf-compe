@@ -16,6 +16,8 @@ const ja = {
   none: 'なし',
   logout: 'ログアウト',
   menu: 'メニュー',
+  quickGuide: 'クイックガイド',
+  userManual: '利用マニュアル',
 
   // ログイン
   loginTitle: 'ログイン',

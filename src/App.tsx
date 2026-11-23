@@ -37,11 +37,8 @@ function Routes() {
   const dash = match('/d/:token', path);
   if (dash) return <Dashboard token={dash.token} />;
 
-  if (path === '/login') return <Login />;
-  if (!getToken()) {
-    navigate('/login');
-    return <Login />;
-  }
+  // 未ログインならログイン画面を出す（URLはそのまま。ログイン後に同じ画面へ進める）
+  if (path === '/login' || !getToken()) return <Login />;
 
   let m: Record<string, string> | null;
   if ((m = match('/c/:id', path))) return <CompeInput key={m.id} id={m.id} />;

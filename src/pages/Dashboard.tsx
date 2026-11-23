@@ -1,5 +1,5 @@
 import { getToken, rpc } from '../api';
-import { ContestTops, ErrorBox, Loading, LocalRules, Ranking, StatusBadge } from '../components';
+import { ContestTops, ErrorBox, HelpLinks, Loading, LocalRules, Ranking, StatusBadge } from '../components';
 import { useLiveData } from '../hooks';
 import { t } from '../i18n';
 import { formatDate } from '../stats';
@@ -20,6 +20,7 @@ export default function Dashboard({ token }: { token: string }) {
       <div className="page">
         <main className="content">
           <div className="card center">{data.error === 'expired' ? t('dashExpired') : t('dashNotFound')}</div>
+          <HelpLinks />
         </main>
       </div>
     );
@@ -59,6 +60,7 @@ export default function Dashboard({ token }: { token: string }) {
             <LocalRules text={data.compe.local_rules} />
           </>
         )}
+        <HelpLinks />
       </main>
     </div>
   );

@@ -32,7 +32,10 @@ export function Page({
         <h1 className="appbar-title">{title}</h1>
         <div className="appbar-right">{right}</div>
       </header>
-      <main className="content">{children}</main>
+      <main className="content">
+        {children}
+        <HelpLinks />
+      </main>
       {footer}
     </div>
   );
@@ -69,6 +72,12 @@ export function UserMenu() {
               <button onClick={() => { setOpen(false); navigate('/admin'); }}>{t('adminMenu')}</button>
             )}
             <button onClick={() => { setOpen(false); navigate('/password'); }}>{t('changePassword')}</button>
+            <a href={`${import.meta.env.BASE_URL}help/quick.html`} target="_blank" rel="noopener">
+              {t('quickGuide')}
+            </a>
+            <a href={`${import.meta.env.BASE_URL}help/manual.html`} target="_blank" rel="noopener">
+              {t('userManual')}
+            </a>
             <button onClick={logout}>{t('logout')}</button>
           </div>
         </>
@@ -195,6 +204,21 @@ export function ContestTops({ body }: { body: CompeBody }) {
         })}
       </ul>
     </section>
+  );
+}
+
+/** クイックガイドと利用マニュアルへのリンク（ログイン不要で読める静的ページ） */
+export function HelpLinks() {
+  const base = import.meta.env.BASE_URL;
+  return (
+    <nav className="help-links">
+      <a href={`${base}help/quick.html`} target="_blank" rel="noopener">
+        📘 {t('quickGuide')}
+      </a>
+      <a href={`${base}help/manual.html`} target="_blank" rel="noopener">
+        📖 {t('userManual')}
+      </a>
+    </nav>
   );
 }
 

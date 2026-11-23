@@ -66,6 +66,7 @@
 - ダッシュボードは開催日（日本時間）の 30 日後を過ぎると表示されなくなります。データは削除されません。
 - Supabase の無料プランは 1 週間使われないと一時停止します。[`keepalive.yml`](.github/workflows/keepalive.yml) が 3 日おきに軽い問い合わせを送って防ぎます。ただし GitHub は、60 日間更新のない公開リポジトリの定期実行を自動で止めます。止まった場合は Actions タブから再開してください。一時停止しても、Supabase の管理画面の **Resume project** で元に戻せます。
 - 画面の文言は [`src/i18n.ts`](src/i18n.ts) にまとめてあり、将来の多言語化に対応できます。
+- クイックガイドと利用マニュアルは、アプリ内の静的ページ（`/help/quick.html`・`/help/manual.html`）として公開しており、ログイン前でも読めます。原稿は [`help/`](help/) の Markdown で、`pip install markdown` のあと `python3 scripts/build_help.py` を実行すると `public/help/` の HTML が作り直されます。画像は `public/help/img/` に置きます。
 
 ## 開発
 
