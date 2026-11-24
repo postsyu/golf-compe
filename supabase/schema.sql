@@ -115,6 +115,35 @@ create table if not exists app.audit_logs (
 );
 create index if not exists audit_logs_compe_idx on app.audit_logs(compe_id, at desc);
 
+-- ---- v2：表示のオンオフ・オリンピック（既存のデータベースにもそのまま追加できる） ----
+-- 表示のオンオフ（データは残し、画面に出すかどうかだけを切り替える）
+alter table app.competitions add column if not exists show_longest boolean not null default true;
+alter table app.competitions add column if not exists show_nearest boolean not null default true;
+alter table app.competitions add column if not exists hidden_penalties text[] not null default '{}'; -- 標準の罰の code
+alter table app.penalty_types add column if not exists hidden boolean not null default false;        -- オリジナル罰用
+-- オリンピック
+alter table app.competitions add column if not exists olympic_enabled   boolean not null default false;
+alter table app.competitions add column if not exists olympic_sand      boolean not null default true;
+alter table app.competitions add column if not exists olympic_kuzutetsu boolean not null default true;
+alter table app.groups add column if not exists olympic_on boolean not null default true;
+
+-- ホールごと・人ごとの結果。点数は保存せず、毎回ここから計算する
+--   state: diamond＝グリーン外からチップイン / ranked＝遠い順の順位あり / giveup＝ギブアップ
+--   rank : ranked のときの遠い順（1＝一番遠い＝金）
+create table if not exists app.olympic_results (
+  compe_id    uuid not null references app.competitions(id) on delete cascade,
+  hole        int  not null check (hole between 1 and 18),
+  user_id     uuid not null references app.users(id),
+  state       text not null check (state in ('diamond', 'ranked', 'giveup')),
+  rank        int  check (rank between 1 and 4),
+  made        boolean not null default false,
+  sand        boolean not null default false,
+  updated_by  uuid references app.users(id),
+  updated_at  timestamptz not null default now(),
+  primary key (compe_id, hole, user_id)
+);
+alter table app.olympic_results enable row level security;
+
 -- 標準の罰（全コンペ共通）
 insert into app.penalty_types (compe_id, code, name, sort, english_only) values
   (null, 'pond',    '池ポチャ',     10, false),
@@ -220,7 +249,8 @@ create or replace function app.compe_body(c app.competitions) returns jsonb
 language sql stable security definer set search_path = app, public, extensions as $$
   select jsonb_build_object(
     'groups', coalesce((
-      select jsonb_agg(jsonb_build_object('id', g.id, 'number', g.number, 'start_time', g.start_time)
+      select jsonb_agg(jsonb_build_object('id', g.id, 'number', g.number, 'start_time', g.start_time,
+                                          'olympic_on', g.olympic_on)
                        order by g.number)
         from app.groups g where g.compe_id = c.id), '[]'::jsonb),
     'players', coalesce((
@@ -233,7 +263,10 @@ language sql stable security definer set search_path = app, public, extensions a
        where p.compe_id = c.id), '[]'::jsonb),
     'penalty_types', coalesce((
       select jsonb_agg(jsonb_build_object('id', t.id, 'name', t.name, 'english_only', t.english_only,
-                                          'custom', t.compe_id is not null)
+                                          'custom', t.compe_id is not null,
+                                          'visible', case when t.compe_id is null
+                                                          then not (t.code = any(c.hidden_penalties))
+                                                          else not t.hidden end)
                        order by t.sort, t.name)
         from app.penalty_types t where t.compe_id is null or t.compe_id = c.id), '[]'::jsonb),
     'holes', jsonb_build_object(
@@ -255,7 +288,17 @@ language sql stable security definer set search_path = app, public, extensions a
                                           'updated_by', ub.display_name))
         from app.contest_leaders l
         left join app.users ub on ub.id = l.updated_by
-       where l.compe_id = c.id), '[]'::jsonb)
+       where l.compe_id = c.id), '[]'::jsonb),
+    'display', jsonb_build_object('longest', c.show_longest, 'nearest', c.show_nearest),
+    'olympic', jsonb_build_object('enabled', c.olympic_enabled, 'sand', c.olympic_sand,
+                                  'kuzutetsu', c.olympic_kuzutetsu),
+    'olympic_results', coalesce((
+      select jsonb_agg(jsonb_build_object('user_id', o.user_id, 'hole', o.hole, 'state', o.state,
+                                          'rank', o.rank, 'made', o.made, 'sand', o.sand,
+                                          'updated_by', ub.display_name))
+        from app.olympic_results o
+        left join app.users ub on ub.id = o.updated_by
+       where o.compe_id = c.id), '[]'::jsonb)
   )
 $$;
 
@@ -482,11 +525,18 @@ begin
     'holes', (app.compe_body(c))->'holes',
     'custom_penalties', coalesce((
       select jsonb_agg(jsonb_build_object(
-               'id', t.id, 'name', t.name,
+               'id', t.id, 'name', t.name, 'hidden', t.hidden,
                'used', (select coalesce(sum(pc.count), 0) from app.penalty_counts pc
                          where pc.penalty_type_id = t.id))
              order by t.sort)
-        from app.penalty_types t where t.compe_id = c.id), '[]'::jsonb)
+        from app.penalty_types t where t.compe_id = c.id), '[]'::jsonb),
+    'standard_penalties', coalesce((
+      select jsonb_agg(jsonb_build_object('code', t.code, 'name', t.name,
+                                          'hidden', t.code = any(c.hidden_penalties)) order by t.sort)
+        from app.penalty_types t where t.compe_id is null), '[]'::jsonb),
+    'display', jsonb_build_object('longest', c.show_longest, 'nearest', c.show_nearest),
+    'olympic', jsonb_build_object('enabled', c.olympic_enabled, 'sand', c.olympic_sand,
+                                  'kuzutetsu', c.olympic_kuzutetsu)
   );
 end $$;
 
@@ -500,6 +550,7 @@ language plpgsql security definer set search_path = app, public, extensions as $
 declare
   u app.users; c app.competitions;
   g jsonb; m jsonb; v_gid uuid; k text; h jsonb; i int := 0; v_keep uuid[] := '{}';
+  v_oly jsonb;
 begin
   u := app.require_admin(p_token);
   c := app.get_compe(p_id);
@@ -516,7 +567,17 @@ begin
          event_date = (p_data->>'event_date')::date,
          course = trim(coalesce(p_data->>'course', '')),
          status = p_data->>'status',
-         local_rules = coalesce(p_data->>'local_rules', '')
+         local_rules = coalesce(p_data->>'local_rules', ''),
+         -- 表示のオンオフとオリンピック（送られてこなければ今の値のまま）
+         show_longest = coalesce((p_data->'display'->>'longest')::boolean, show_longest),
+         show_nearest = coalesce((p_data->'display'->>'nearest')::boolean, show_nearest),
+         hidden_penalties = coalesce((select array_agg(x) from jsonb_array_elements_text(
+                                        p_data->'display'->'hidden_standard') x), case
+                                       when p_data->'display' ? 'hidden_standard' then '{}'::text[]
+                                       else hidden_penalties end),
+         olympic_enabled = coalesce((p_data->'olympic'->>'enabled')::boolean, olympic_enabled),
+         olympic_sand = coalesce((p_data->'olympic'->>'sand')::boolean, olympic_sand),
+         olympic_kuzutetsu = coalesce((p_data->'olympic'->>'kuzutetsu')::boolean, olympic_kuzutetsu)
    where id = c.id;
 
   -- 組と参加者（同じ人が 2 つの組に入っていたらエラー）
@@ -527,11 +588,15 @@ begin
     perform app.err('duplicate_member');
   end if;
 
+  -- 組ごとのオリンピック表示設定は、組番号で引き継ぐ
+  select coalesce(jsonb_object_agg(number::text, olympic_on), '{}'::jsonb) into v_oly
+    from app.groups where compe_id = c.id;
   delete from app.participants where compe_id = c.id;
   delete from app.groups where compe_id = c.id;
   for g in select * from jsonb_array_elements(coalesce(p_data->'groups', '[]')) loop
-    insert into app.groups (compe_id, number, start_time)
-    values (c.id, (g->>'number')::int, coalesce(g->>'start_time', ''))
+    insert into app.groups (compe_id, number, start_time, olympic_on)
+    values (c.id, (g->>'number')::int, coalesce(g->>'start_time', ''),
+            coalesce((v_oly->>(g->>'number'))::boolean, true))
     returning id into v_gid;
     for m in select * from jsonb_array_elements(coalesce(g->'members', '[]')) loop
       insert into app.participants (compe_id, user_id, group_id)
@@ -556,11 +621,14 @@ begin
     end if;
     if (g->>'id') is not null
        and exists (select 1 from app.penalty_types where id = (g->>'id')::uuid and compe_id = c.id) then
-      update app.penalty_types set name = trim(g->>'name'), sort = 100 + i where id = (g->>'id')::uuid;
+      update app.penalty_types set name = trim(g->>'name'), sort = 100 + i,
+                                   hidden = coalesce((g->>'hidden')::boolean, false)
+       where id = (g->>'id')::uuid;
       v_keep := v_keep || (g->>'id')::uuid;
     else
-      insert into app.penalty_types (compe_id, name, sort)
-      values (c.id, trim(g->>'name'), 100 + i) returning id into v_gid;
+      insert into app.penalty_types (compe_id, name, sort, hidden)
+      values (c.id, trim(g->>'name'), 100 + i, coalesce((g->>'hidden')::boolean, false))
+      returning id into v_gid;
       v_keep := v_keep || v_gid;
     end if;
   end loop;
@@ -677,6 +745,120 @@ begin
           coalesce((select display_name from app.users where id = p_user_id), 'なし'));
   v_ver := app.bump(c.id);
   return v_ver;
+end $$;
+
+-- オリンピック ---------------------------------------------------------
+-- ログ用の表示（例：「金・成功・砂イチ」「ダイヤ」「ギブアップ」「未入力」）
+create or replace function app.oly_text(p_state text, p_rank int, p_made boolean, p_sand boolean) returns text
+language sql immutable as $$
+  select case
+    when p_state is null then '未入力'
+    when p_state = 'giveup' then 'ギブアップ'
+    when p_state = 'diamond' then 'ダイヤ' || case when p_sand then '・砂イチ' else '' end
+    else (array['金', '銀', '銅', '鉄'])[p_rank]
+         || case when p_made then '・成功' else '・失敗' end
+         || case when p_sand then '・砂イチ' else '' end
+  end
+$$;
+
+-- 組の「オリンピックを表示する／しない」（組の全員とダッシュボードに反映）
+create or replace function public.api_set_group_olympic(p_token text, p_compe_id uuid, p_group_id uuid,
+                                                        p_on boolean) returns bigint
+language plpgsql security definer set search_path = app, public, extensions as $$
+declare u app.users; c app.competitions; g app.groups;
+begin
+  u := app.require_user(p_token);
+  c := app.get_compe(p_compe_id);
+  if not app.can_input(u, c) then perform app.err('forbidden'); end if;
+  if c.status = 'finished' then perform app.err('compe_finished'); end if;
+  select * into g from app.groups where id = p_group_id and compe_id = c.id;
+  if not found or p_on is null then perform app.err('invalid_input'); end if;
+  if g.olympic_on = p_on then return c.version; end if;
+  update app.groups set olympic_on = p_on where id = g.id;
+  insert into app.audit_logs (compe_id, actor_id, item, before_val, after_val)
+  values (c.id, u.id, format('オリンピック表示（%s組）', g.number),
+          case when g.olympic_on then '表示' else '非表示' end,
+          case when p_on then '表示' else '非表示' end);
+  return app.bump(c.id);
+end $$;
+
+-- 1 ホール分（1 組）のオリンピックの結果をまとめて保存する
+-- p_entries = [{user_id, state: 'none'|'diamond'|'ranked'|'giveup', rank, made, sand}]（組の全員分）
+create or replace function public.api_save_olympic(p_token text, p_compe_id uuid, p_hole int, p_group_id uuid,
+                                                   p_entries jsonb) returns bigint
+language plpgsql security definer set search_path = app, public, extensions as $$
+declare
+  u app.users; c app.competitions; g app.groups; e jsonb; v_members uuid[]; v_n int;
+  v_user uuid; v_state text; v_rank int; v_made boolean; v_sand boolean; v_ranks int[] := '{}';
+  o app.olympic_results; v_changed boolean := false; v_before text; v_after text;
+begin
+  u := app.require_user(p_token);
+  c := app.get_compe(p_compe_id);
+  if not app.can_input(u, c) then perform app.err('forbidden'); end if;
+  if c.status = 'finished' then perform app.err('compe_finished'); end if;
+  if p_hole not between 1 and 18 then perform app.err('invalid_input'); end if;
+  select * into g from app.groups where id = p_group_id and compe_id = c.id;
+  if not found then perform app.err('invalid_input'); end if;
+  if not c.olympic_enabled or not g.olympic_on then perform app.err('olympic_off'); end if;
+  select array_agg(user_id) into v_members from app.participants where compe_id = c.id and group_id = g.id;
+  v_n := coalesce(array_length(v_members, 1), 0);
+  if v_n not between 3 and 4 then perform app.err('olympic_group_size'); end if;
+  if jsonb_typeof(p_entries) <> 'array' then perform app.err('invalid_input'); end if;
+
+  -- 入力チェック
+  for e in select * from jsonb_array_elements(p_entries) loop
+    v_user := (e->>'user_id')::uuid;
+    v_state := coalesce(e->>'state', 'none');
+    if not (v_user = any(v_members)) or v_state not in ('none', 'diamond', 'ranked', 'giveup') then
+      perform app.err('invalid_input');
+    end if;
+    if v_state = 'ranked' then v_ranks := v_ranks || (e->>'rank')::int; end if;
+    if coalesce((e->>'sand')::boolean, false) and not (v_state = 'diamond'
+         or (v_state = 'ranked' and coalesce((e->>'made')::boolean, false))) then
+      perform app.err('invalid_input');
+    end if;
+  end loop;
+  if (select count(distinct x->>'user_id') from jsonb_array_elements(p_entries) x) <> jsonb_array_length(p_entries) then
+    perform app.err('invalid_input');
+  end if;
+  -- 順位は 1 から連番
+  if coalesce(array_length(v_ranks, 1), 0) > 0 and
+     (select array_agg(r order by r) from unnest(v_ranks) r)
+       <> (select array_agg(i) from generate_series(1, array_length(v_ranks, 1)) i) then
+    perform app.err('invalid_input');
+  end if;
+
+  -- 保存（変わった人だけログを残す）
+  for e in select * from jsonb_array_elements(p_entries) loop
+    v_user := (e->>'user_id')::uuid;
+    v_state := coalesce(e->>'state', 'none');
+    v_rank := case when v_state = 'ranked' then (e->>'rank')::int end;
+    v_made := case v_state when 'diamond' then true when 'ranked' then coalesce((e->>'made')::boolean, false)
+                           else false end;
+    v_sand := v_state in ('diamond', 'ranked') and coalesce((e->>'sand')::boolean, false);
+    select * into o from app.olympic_results where compe_id = c.id and hole = p_hole and user_id = v_user for update;
+    v_before := app.oly_text(o.state, o.rank, o.made, o.sand);
+    v_after := app.oly_text(case when v_state = 'none' then null else v_state end, v_rank, v_made, v_sand);
+    if v_before = v_after then continue; end if;
+    if v_state = 'none' then
+      delete from app.olympic_results where compe_id = c.id and hole = p_hole and user_id = v_user;
+    else
+      insert into app.olympic_results (compe_id, hole, user_id, state, rank, made, sand, updated_by, updated_at)
+      values (c.id, p_hole, v_user, v_state, v_rank, v_made, v_sand, u.id, now())
+      on conflict (compe_id, hole, user_id) do update
+        set state = excluded.state, rank = excluded.rank, made = excluded.made, sand = excluded.sand,
+            updated_by = u.id, updated_at = now();
+    end if;
+    insert into app.audit_logs (compe_id, actor_id, target_user_id, hole, item, before_val, after_val)
+    values (c.id, u.id, v_user, p_hole, 'オリンピック', v_before, v_after);
+    v_changed := true;
+  end loop;
+
+  if v_changed then return app.bump(c.id); end if;
+  return c.version;
+exception
+  when invalid_text_representation then perform app.err('invalid_input');
+  when check_violation then perform app.err('invalid_input');
 end $$;
 
 create or replace function public.api_logs(p_token text, p_compe_id uuid) returns jsonb

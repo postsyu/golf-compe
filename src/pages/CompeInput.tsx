@@ -4,15 +4,17 @@ import { ContestTops, ErrorBox, Loading, LocalRules, Page, Ranking, StatusBadge,
 import { useLiveData } from '../hooks';
 import { errorMessage, t } from '../i18n';
 import { navigate } from '../router';
-import { countOf } from '../stats';
+import type { OlympicEntry } from '../olympic';
+import { OlympicBoard, OlympicInput } from '../OlympicViews';
+import { countOf, normalizeBody, visibleBody } from '../stats';
 import type { CompeState, ContestKind } from '../types';
 
 const HOLES = Array.from({ length: 18 }, (_, i) => i + 1);
 const NO_GROUP = 'none';
 
 export default function CompeInput({ id }: { id: string }) {
-  const { data, setData, error, reload } = useLiveData<CompeState>(
-    () => authed<CompeState>('api_competition_state', { p_id: id }),
+  const { data: raw, setData, error, reload } = useLiveData<CompeState>(
+    () => authed<CompeState>('api_competition_state', { p_id: id }).then(normalizeBody),
     () => authed<number>('api_version', { p_id: id }),
     (d) => d.compe.version,
     3000,
@@ -27,6 +29,10 @@ export default function CompeInput({ id }: { id: string }) {
   const [groupKey, setGroupKey] = useState<string | null>(null);
   const [tab, setTab] = useState<'input' | 'summary'>('input');
   const inflight = useRef(0);
+  const olySave = useRef<Promise<unknown>>(Promise.resolve());
+
+  // 表示のオンオフを反映したもの（オフの項目は画面に出さない）
+  const data = useMemo(() => (raw ? visibleBody(raw) : null), [raw]);
 
   // 最初は自分の組を表示
   useEffect(() => {
@@ -42,7 +48,7 @@ export default function CompeInput({ id }: { id: string }) {
     return tabs;
   }, [data]);
 
-  if (!data) {
+  if (!raw || !data) {
     return (
       <Page title={t('appName')} back="/" right={<UserMenu />}>
         {error ? <ErrorBox code={error} onRetry={reload} /> : <Loading />}
@@ -79,6 +85,42 @@ export default function CompeInput({ id }: { id: string }) {
     } finally {
       inflight.current--;
       if (inflight.current === 0) reload();
+    }
+  };
+
+  // オリンピック：1 ホール・1 組分をまとめて保存（順番に送る）
+  const group = data.groups.find((g) => g.id === groupKey);
+  const saveOlympic = (entries: OlympicEntry[]) => {
+    if (!group) return;
+    const memberIds = data.players.filter((p) => p.group_id === group.id).map((p) => p.user_id);
+    setData((d) => {
+      if (!d) return d;
+      const others = d.olympic_results.filter((r) => !(r.hole === hole && memberIds.includes(r.user_id)));
+      return { ...d, olympic_results: [...others, ...entries.map((e) => ({ ...e, hole, updated_by: null }))] };
+    });
+    const payload = memberIds.map((uid) => {
+      const e = entries.find((x) => x.user_id === uid);
+      return e ? { ...e } : { user_id: uid, state: 'none' };
+    });
+    const h = hole;
+    inflight.current++;
+    olySave.current = olySave.current
+      .then(() => authed('api_save_olympic', { p_compe_id: id, p_hole: h, p_group_id: group.id, p_entries: payload }))
+      .catch((e) => toast(errorMessage(e instanceof ApiError ? e.code : 'unknown'), 'error'))
+      .finally(() => {
+        inflight.current--;
+        if (inflight.current === 0) reload();
+      });
+  };
+  const toggleGroupOlympic = async (on: boolean) => {
+    if (!group) return;
+    setData((d) => (d ? { ...d, groups: d.groups.map((g) => (g.id === group.id ? { ...g, olympic_on: on } : g)) } : d));
+    try {
+      await authed('api_set_group_olympic', { p_compe_id: id, p_group_id: group.id, p_on: on });
+    } catch (e) {
+      toast(errorMessage(e instanceof ApiError ? e.code : 'unknown'), 'error');
+    } finally {
+      reload();
     }
   };
 
@@ -125,14 +167,15 @@ export default function CompeInput({ id }: { id: string }) {
           {t('inputTab')}
         </button>
         <button className={tab === 'summary' ? 'on' : ''} onClick={() => setTab('summary')}>
-          {t('penaltyRanking')}
+          {t('rankingTab')}
         </button>
       </div>
 
       {tab === 'summary' ? (
         <>
-          <Ranking body={data} />
           <ContestTops body={data} />
+          <Ranking body={data} />
+          <OlympicBoard body={data} />
         </>
       ) : (
         <>
@@ -206,9 +249,21 @@ export default function CompeInput({ id }: { id: string }) {
             </div>
           )}
 
+          {/* オリンピック（この組・このホール） */}
+          {group && (
+            <OlympicInput
+              body={data}
+              group={group}
+              hole={hole}
+              disabled={finished}
+              onChange={saveOlympic}
+              onToggleGroup={toggleGroupOlympic}
+            />
+          )}
+
           {/* 罰ゲームの入力 */}
           {players.length === 0 && <p className="card muted">{t('noPlayersInGroup')}</p>}
-          {players.map((p) => {
+          {types.length > 0 && players.map((p) => {
             const holeTotal = types.reduce((s, pt) => s + (countOf(data, p.user_id, hole, pt.id)?.count ?? 0), 0);
             return (
               <section key={p.user_id} className="card player-card">

@@ -31,6 +31,7 @@ export interface Group {
   id: string;
   number: number;
   start_time: string;
+  olympic_on: boolean;
 }
 
 export interface Player {
@@ -44,6 +45,7 @@ export interface PenaltyType {
   name: string;
   english_only: boolean;
   custom: boolean;
+  visible: boolean;
 }
 
 export interface Holes {
@@ -74,6 +76,9 @@ export interface CompeBody {
   holes: Holes;
   counts: PenaltyCount[];
   leaders: Leader[];
+  display: { longest: boolean; nearest: boolean };
+  olympic: OlympicSettings;
+  olympic_results: OlympicResult[];
 }
 
 export interface CompeState extends CompeBody {
@@ -95,7 +100,28 @@ export interface AdminCompeDetail extends CompeSummary {
   public_token: string;
   groups: { number: number; start_time: string; members: string[] }[];
   holes: Holes;
-  custom_penalties: { id?: string; name: string; used: number }[];
+  custom_penalties: { id?: string; name: string; used: number; hidden: boolean }[];
+  standard_penalties: { code: string; name: string; hidden: boolean }[];
+  display: { longest: boolean; nearest: boolean };
+  olympic: OlympicSettings;
+}
+
+export interface OlympicSettings {
+  enabled: boolean;
+  sand: boolean;
+  kuzutetsu: boolean;
+}
+
+/** オリンピックの 1 ホール・1 人分。state が無い（記録なし）は「未入力」 */
+export type OlympicState = 'diamond' | 'ranked' | 'giveup';
+export interface OlympicResult {
+  user_id: string;
+  hole: number;
+  state: OlympicState;
+  rank: number | null;
+  made: boolean;
+  sand: boolean;
+  updated_by: string | null;
 }
 
 export interface LogRow {

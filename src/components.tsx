@@ -142,6 +142,7 @@ export function Ranking({ body }: { body: CompeBody }) {
   const rows = penaltyRanking(body);
   const [open, setOpen] = useState<string | null>(null);
   const anyPenalty = rows.some((r) => r.total > 0);
+  if (body.penalty_types.length === 0) return null; // 罰がすべて非表示
   return (
     <section className="card">
       <h2>{t('penaltyRanking')}</h2>
@@ -186,6 +187,7 @@ export function ContestTops({ body }: { body: CompeBody }) {
     ...body.holes.longest.map((hole) => ({ hole, kind: 'longest' as const })),
     ...body.holes.nearest.map((hole) => ({ hole, kind: 'nearest' as const })),
   ].sort((a, b) => a.hole - b.hole);
+  if (!body.display.longest && !body.display.nearest) return null; // 両方とも非表示
   return (
     <section className="card">
       <h2>{t('contestTop')}</h2>

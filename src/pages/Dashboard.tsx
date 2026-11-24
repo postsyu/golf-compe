@@ -2,6 +2,8 @@ import { getToken, rpc } from '../api';
 import { ContestTops, ErrorBox, HelpLinks, Loading, LocalRules, Ranking, StatusBadge } from '../components';
 import { useLiveData } from '../hooks';
 import { t } from '../i18n';
+import { OlympicBoard } from '../OlympicViews';
+import { normalizeBody, visibleBody } from '../stats';
 import { formatDate } from '../stats';
 import type { DashboardData } from '../types';
 
@@ -9,7 +11,7 @@ type DashResult = DashboardData | { error: 'not_found' | 'expired' };
 
 export default function Dashboard({ token }: { token: string }) {
   const { data, error, reload, updatedAt } = useLiveData<DashResult>(
-    () => rpc<DashResult>('api_dashboard', { p_public_token: token }),
+    () => rpc<DashResult>('api_dashboard', { p_public_token: token }).then((d) => ('error' in d ? d : normalizeBody(d))),
     () => rpc<number>('api_dashboard_version', { p_public_token: token }),
     (d) => ('error' in d ? -1 : d.compe.version),
     4000,
@@ -55,8 +57,9 @@ export default function Dashboard({ token }: { token: string }) {
         {!data && !error && <Loading />}
         {data && (
           <>
-            <ContestTops body={data} />
-            <Ranking body={data} />
+            <ContestTops body={visibleBody(data)} />
+            <Ranking body={visibleBody(data)} />
+            <OlympicBoard body={data} />
             <LocalRules text={data.compe.local_rules} />
           </>
         )}

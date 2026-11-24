@@ -231,3 +231,57 @@ input.short { width: 80px; }
 .log-change { color: var(--muted); }
 .log-change strong { color: var(--text); }
 .reset-row input { flex: 1; }
+
+/* ---- スイッチ（表示のオンオフ・オリンピック設定） ---- */
+.switch-list { display: flex; flex-direction: column; }
+.switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0;
+  border-top: 1px solid var(--line); cursor: pointer; font-weight: 600; }
+.switch:first-child { border-top: 0; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch-ui { flex-shrink: 0; width: 50px; height: 30px; border-radius: 999px; background: #ccd3cf; position: relative; transition: background .15s; }
+.switch-ui::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s; }
+.switch input:checked + .switch-ui { background: var(--green); }
+.switch input:checked + .switch-ui::after { transform: translateX(20px); }
+.switch input:focus-visible + .switch-ui { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* ---- オリンピック ---- */
+.link-btn { border: 0; background: none; color: var(--green); font-weight: 600; font-size: .85rem; padding: 6px 0; cursor: pointer; }
+.link-btn:disabled { opacity: .4; }
+.olympic-off { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.olympic-card { border-left: 5px solid #b08a1e; display: flex; flex-direction: column; gap: 8px; }
+.olympic-card h2 { margin: 0; }
+.oly-row { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.oly-main { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 4px 8px; border: 1px dashed var(--line);
+  border-radius: 10px; background: #fff; text-align: left; cursor: pointer; }
+.oly-row.set .oly-main { border-style: solid; }
+.oly-main:disabled { cursor: default; opacity: 1; }
+.oly-name { flex: 1; font-weight: 700; font-size: 1.05rem; }
+.oly-pts { font-weight: 800; font-size: 1.1rem; color: var(--green); }
+.oly-pts.minus { color: var(--red); }
+.medal { min-width: 44px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: .95rem; background: #eef1ef; color: var(--muted); }
+.medal.m1 { background: #f3d36b; color: #5a4300; }
+.medal.m2 { background: #d9dde2; color: #3b4450; }
+.medal.m3 { background: #e2b48a; color: #5b3313; }
+.medal.m4 { background: #8f8f8f; color: #fff; }
+.medal.diamond { background: #b8e4f4; color: #0d5873; }
+.medal.giveup { background: #f1f1f1; color: #999; font-size: .8rem; }
+.oly-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip-btn { min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #fff;
+  font-weight: 600; font-size: .85rem; cursor: pointer; }
+.chip-btn.on { background: var(--green); color: #fff; border-color: var(--green); }
+.chip-btn.diamond.on { background: #1d7fa3; border-color: #1d7fa3; }
+.chip-btn:disabled { opacity: .35; }
+.olympic-group { margin-top: 10px; }
+.olympic-group h3 { font-size: .95rem; margin: 6px 0 2px; color: var(--muted); }
+.olympic-head, .olympic-row { display: grid; grid-template-columns: 40px 1fr 44px 56px; align-items: center; gap: 6px; }
+.olympic-head { font-size: .72rem; color: var(--muted); text-align: right; }
+.olympic-rows { list-style: none; margin: 0; padding: 0; }
+.olympic-rows > li { border-top: 1px solid var(--line); }
+.olympic-row { width: 100%; border: 0; background: none; padding: 8px 0; text-align: left; cursor: pointer; }
+.olympic-raw { text-align: right; color: var(--muted); font-weight: 600; }
+.olympic-final { text-align: right; font-weight: 800; font-size: 1.1rem; }
+.olympic-final.plus { color: var(--green); }
+.olympic-final.minus { color: var(--red); }
+.olympic-rows .detail { margin-left: 46px; }

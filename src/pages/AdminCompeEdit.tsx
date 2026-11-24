@@ -25,7 +25,13 @@ export default function AdminCompeEdit({ id }: { id: string }) {
         authed<AdminCompeDetail>('api_get_competition_admin', { p_id: id }),
         authed<UserRow[]>('api_list_users'),
       ]);
-      setForm(c);
+      setForm({
+        ...c,
+        custom_penalties: c.custom_penalties.map((x) => ({ ...x, hidden: x.hidden ?? false })),
+        standard_penalties: c.standard_penalties ?? [],
+        display: c.display ?? { longest: true, nearest: true },
+        olympic: c.olympic ?? { enabled: false, sand: true, kuzutetsu: true },
+      });
       setUsers(u);
       setError(null);
     } catch (e) {
@@ -83,7 +89,13 @@ export default function AdminCompeEdit({ id }: { id: string }) {
           holes: form.holes,
           custom_penalties: form.custom_penalties
             .filter((p) => p.name.trim())
-            .map((p) => ({ id: p.id ?? null, name: p.name })),
+            .map((p) => ({ id: p.id ?? null, name: p.name, hidden: p.hidden })),
+          display: {
+            longest: form.display.longest,
+            nearest: form.display.nearest,
+            hidden_standard: form.standard_penalties.filter((x) => x.hidden).map((x) => x.code),
+          },
+          olympic: form.olympic,
         },
       });
       toast(t('saved'));
@@ -254,9 +266,68 @@ export default function AdminCompeEdit({ id }: { id: string }) {
             </button>
           </div>
         ))}
-        <button className="btn" onClick={() => update({ custom_penalties: [...form.custom_penalties, { name: '', used: 0 }] })}>
+        <button className="btn" onClick={() => update({ custom_penalties: [...form.custom_penalties, { name: '', used: 0, hidden: false }] })}>
           ＋ {t('addPenalty')}
         </button>
+      </section>
+
+      <section className="card">
+        <h2>{t('displaySettings')}</h2>
+        <p className="hint">{t('displaySettingsHint')}</p>
+        <div className="switch-list">
+          <Switch label={t('longest')} on={form.display.longest} onChange={(v) => update({ display: { ...form.display, longest: v } })} />
+          <Switch label={t('nearest')} on={form.display.nearest} onChange={(v) => update({ display: { ...form.display, nearest: v } })} />
+          {form.standard_penalties.map((sp) => (
+            <Switch
+              key={sp.code}
+              label={sp.name}
+              on={!sp.hidden}
+              onChange={(v) =>
+                update({
+                  standard_penalties: form.standard_penalties.map((x) => (x.code === sp.code ? { ...x, hidden: !v } : x)),
+                })
+              }
+            />
+          ))}
+          {form.custom_penalties.map((cp, i) =>
+            cp.name.trim() ? (
+              <Switch
+                key={cp.id ?? `new-${i}`}
+                label={cp.name}
+                on={!cp.hidden}
+                onChange={(v) =>
+                  update({ custom_penalties: form.custom_penalties.map((x, j) => (j === i ? { ...x, hidden: !v } : x)) })
+                }
+              />
+            ) : null,
+          )}
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>{t('olympicSettings')}</h2>
+        <p className="hint">{t('olympicSettingsHint')}</p>
+        <div className="switch-list">
+          <Switch
+            label={t('olympicEnable')}
+            on={form.olympic.enabled}
+            onChange={(v) => update({ olympic: { ...form.olympic, enabled: v } })}
+          />
+          {form.olympic.enabled && (
+            <>
+              <Switch
+                label={t('olympicSandOpt')}
+                on={form.olympic.sand}
+                onChange={(v) => update({ olympic: { ...form.olympic, sand: v } })}
+              />
+              <Switch
+                label={t('olympicKuzutetsuOpt')}
+                on={form.olympic.kuzutetsu}
+                onChange={(v) => update({ olympic: { ...form.olympic, kuzutetsu: v } })}
+              />
+            </>
+          )}
+        </div>
       </section>
 
       <section className="card form">
@@ -266,5 +337,15 @@ export default function AdminCompeEdit({ id }: { id: string }) {
         </label>
       </section>
     </Page>
+  );
+}
+
+function Switch({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="switch">
+      <span>{label}</span>
+      <input type="checkbox" role="switch" checked={on} onChange={(e) => onChange(e.target.checked)} />
+      <span className="switch-ui" aria-hidden="true" />
+    </label>
   );
 }
