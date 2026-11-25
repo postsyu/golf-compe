@@ -46,8 +46,8 @@ export default function Dashboard({ token }: { token: string }) {
             {t('autoUpdate')}
             {updatedAt && ` · ${t('lastUpdated', { time: updatedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) })}`}
           </p>
-          {/* 入力画面へ（未ログインならログイン画面が開く） */}
-          <a className="dash-input-link" href="#/">
+          {/* このコンペの入力画面へ（未ログインならログイン後に移る。古いDBでIDがなければコンペ一覧へ） */}
+          <a className="dash-input-link" href={data?.compe.id ? `#/c/${data.compe.id}` : '#/'}>
             ✎ {getToken() ? t('goToInput') : t('loginToInput')}
           </a>
         </div>

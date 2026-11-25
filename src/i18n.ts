@@ -37,6 +37,9 @@ const ja = {
 
   // コンペ選択
   selectCompe: 'コンペを選択',
+  noInputPermission: 'このコンペの入力権限がありません。コンペの参加者として登録されているか、幹事に確認してください。',
+  compeNotFound: 'コンペが見つかりません。',
+  backToCompeList: 'コンペ一覧へ',
   noCompe: '参加中のコンペはありません。コンペ管理者に登録を依頼してください。',
   adminMenu: '管理メニュー',
   changePassword: 'パスワード変更',

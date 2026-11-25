@@ -92,7 +92,7 @@ export interface CompeState extends CompeBody {
 }
 
 export interface DashboardData extends CompeBody {
-  compe: Omit<CompeSummary, 'id'> & { local_rules: string; version: number };
+  compe: Omit<CompeSummary, 'id'> & { id?: string; local_rules: string; version: number };
 }
 
 export interface AdminCompeDetail extends CompeSummary {

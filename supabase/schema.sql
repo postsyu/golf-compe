@@ -891,7 +891,7 @@ begin
   if app.today_jst() > c.event_date + 30 then return jsonb_build_object('error', 'expired'); end if;
   return app.compe_body(c) || jsonb_build_object(
     'compe', jsonb_build_object(
-      'name', c.name, 'event_date', c.event_date, 'course', c.course, 'status', c.status,
+      'id', c.id, 'name', c.name, 'event_date', c.event_date, 'course', c.course, 'status', c.status,
       'local_rules', c.local_rules, 'version', c.version));
 end $$;
 

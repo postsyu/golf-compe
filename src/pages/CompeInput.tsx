@@ -51,7 +51,19 @@ export default function CompeInput({ id }: { id: string }) {
   if (!raw || !data) {
     return (
       <Page title={t('appName')} back="/" right={<UserMenu />}>
-        {error ? <ErrorBox code={error} onRetry={reload} /> : <Loading />}
+        {error === 'forbidden' || error === 'not_found' ? (
+          // 参加していないコンペ（ダッシュボードのリンクから来た場合など）
+          <div className="card center">
+            <p>{t(error === 'forbidden' ? 'noInputPermission' : 'compeNotFound')}</p>
+            <button className="btn" onClick={() => navigate('/')}>
+              {t('backToCompeList')}
+            </button>
+          </div>
+        ) : error ? (
+          <ErrorBox code={error} onRetry={reload} />
+        ) : (
+          <Loading />
+        )}
       </Page>
     );
   }
